@@ -1,0 +1,215 @@
+#include <EEPROM.h>
+
+int Valve1 = 8;//6;     // Red RGB pin -> D3
+int Valve2 = 9;//7;   // Green RGB pin -> D5
+
+int TurboPump_Vent = 4;     // Red RGB pin -> D3
+int TurboPump_Motor = 5;   // Green RGB pin -> D5
+int TurboPump_Station = 6;     // Red RGB pin -> D3
+
+int valve1Read = A4;
+
+int NeedleValve = 10;     // Red RGB pin -> D3
+
+int Valve1Open = 0;
+int Valve2Open = 0;
+
+int TurboPump_Vent_On = 0;
+int TurboPump_Motor_On = 0;
+int TurboPump_Station_On = 0;
+int Needle_valveOpen = 0;
+
+int P1_Pin = A1;
+int P2_Pin = A5;
+
+int val_P1 = 0;  
+int val_P2 = 0;
+int Turbo_Pump_Speed = 0;
+
+int addr_VA1 = 1;
+int addr_VA2 = 2;
+
+const char * status1 = "closed";
+const char * status2 = "closed";
+
+const char * statusNVL = "closed";
+const char * statusTurboPump = "TB not started";
+
+int Analog;
+unsigned long Sum;
+unsigned long Average; 
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(Valve1,OUTPUT);
+  pinMode(valve1Read,INPUT);
+
+  pinMode(Valve2,OUTPUT);
+
+  pinMode(TurboPump_Vent,OUTPUT);
+  pinMode(TurboPump_Motor,OUTPUT);
+  pinMode(TurboPump_Station,OUTPUT);
+
+  pinMode(NeedleValve,OUTPUT);
+  
+  pinMode(P1_Pin,INPUT);
+  pinMode(P2_Pin,INPUT);
+  pinMode(Turbo_Pump_Speed,INPUT);
+
+  checkValveState();
+
+  // Serial.println("Ready for command input");
+  //pinMode(NeedleValve, OUTPUT); // Set pin for output to control TIP120 Base pin
+}
+
+void loop() {
+  String command = "";
+  int value = 2;
+  
+  if (Serial.available() > 0) {
+  
+  command = Serial.readStringUntil(':');
+  value = Serial.parseInt();
+
+  if(command == "STA"){
+    Serial.print("status:");
+    Serial.print(",");
+    Serial.print(digitalRead(Valve1));
+    Serial.print(",");
+    Serial.print(digitalRead(Valve2));
+    Serial.print(",");
+    Serial.print(digitalRead(TurboPump_Vent));
+    Serial.print(",");
+    Serial.print(digitalRead(TurboPump_Motor));
+    Serial.print(",");
+    Serial.print(digitalRead(TurboPump_Station));       
+    Serial.print(",");
+    Serial.print(Needle_valveOpen);  
+    Serial.print(",");
+    Serial.print(analogRead(P1_Pin));  
+    Serial.print(",");
+    Serial.print(analogRead(P2_Pin));
+    Serial.print(",");
+    Serial.println(analogRead(Turbo_Pump_Speed));  
+    }
+
+  if (command == "VA1"){
+     
+      if (value == 1)
+      {
+        status1 = "open";
+        Valve1Open = value;
+        EEPROM.update(addr_VA1, Valve1Open);
+        Serial.println("VA1:1");
+      }
+      else{
+        status1 = "closed";
+        Valve1Open = 0;
+        EEPROM.update(addr_VA1, Valve1Open);
+        Serial.println("VA1:0");
+      }
+    }
+
+    if (command == "VA2"){
+
+      if (value == 1)
+      {
+        status2 = "open";
+        Valve2Open = value;
+        EEPROM.update(addr_VA2, Valve2Open);
+        Serial.println("VA2:1");
+
+      }
+      else{
+        status2 = "closed";
+        Valve2Open = 0;
+        EEPROM.update(addr_VA2, Valve2Open);
+        Serial.println("VA2:0");
+      }
+    }
+    
+    if (command == "TBM"){
+
+      if (value == 1)
+      {
+        TurboPump_Motor_On = value;
+        Serial.println("TBM:1");
+
+      }
+      else{
+        TurboPump_Motor_On = 0;
+        Serial.println("TBM:0");
+      }
+    }
+    
+    if (command == "TBV"){
+
+      if (value == 1)
+      {
+        TurboPump_Vent_On = value;
+        Serial.println("TBV:1");
+
+      }
+      else{
+        TurboPump_Vent_On = 0;
+        Serial.println("TBV:0");
+      }
+    }
+    
+    if (command == "TBS"){
+
+      if (value == 1)
+      {
+        TurboPump_Station_On = value;
+        Serial.println("TBS:1");
+
+      }
+      else{
+        TurboPump_Station_On = 0;
+        Serial.println("TBS:0");
+      }
+    }
+
+    if (command == "NVL"){
+      if (value>200){
+        value =200;
+        }
+      Needle_valveOpen = value;
+      Serial.print("NVL:");
+      Serial.println(value);
+    }
+  }
+
+  digitalWrite(Valve1, Valve1Open);
+  digitalWrite(Valve2, Valve2Open);
+  digitalWrite(TurboPump_Vent, TurboPump_Vent_On);
+  digitalWrite(TurboPump_Motor, TurboPump_Motor_On);
+  digitalWrite(TurboPump_Station, TurboPump_Station_On);
+  analogWrite(NeedleValve,Needle_valveOpen) ; 
+  
+  //analogWrite(NeedleValve, 100);
+
+Sum = 0;
+  for (int i = 0; i < 1000; i++)
+{
+  Analog = analogRead(P2_Pin);
+
+  Sum = Sum + Analog;  //Sum for averaging    
+}
+
+Average = (Sum/1000);
+
+  
+//Serial.println(Average);
+
+
+}
+
+
+void checkValveState() {
+   Serial.println("Valve status after restart: ");
+   Valve1Open = EEPROM.read(addr_VA1);
+   Valve2Open = EEPROM.read(addr_VA2);
+   digitalWrite(Valve1, Valve1Open);
+   digitalWrite(Valve2, Valve2Open);
+}
