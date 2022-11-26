@@ -15,43 +15,45 @@
 
 // Assign port pins to code name
 // Valves
-#define Valve1 8; //Assign valve 1 pin to name
-#define valve1Read A4; // analog input pin
+#define Valve1 8 //Assign valve 1 control pin
+#define valve1Read A4 // Valve 1 status input
 
-#define Valve2 9; // Assign valve 2 pin to name
-
+#define Valve2 9 // Assign valve 2 control pin
+#define valve2Read A2 // Valve 2 status input
 
 // Turbo pump control with relais contacting TC1200 remote port
 // See turbo pump manual page 19
-#define TurboPump_Vent 4;		// pin for turbo pump venting relais
-#define TurboPump_Motor 5;		// pin for turbo pump motor relais
-#define TurboPump_Station 6;	// pin for turbo pump station relais
+#define TurboPump_Vent 4		// pin for turbo pump venting relais
+#define TurboPump_Motor 5		// pin for turbo pump motor relais
+#define TurboPump_Station 6	// pin for turbo pump station relais
 
-#define P1_Pin A1;				// whatever conection we are reading here!
-#define P2_Pin A5;
+#define P1_Pin A1				// whatever conection we are reading here!
+#define P2_Pin A5
 
 // EEPROM memory addresses
 	int addr_VA1 = 1;	// status of valve 1 on/off
-	int addr_VA2 = 2;	// status of valve 1 on/off
+	int addr_VA2 = 2;	// status of valve 2 on/off
 	int addr_TBM = 3;	// status of motor on/off
 	int addr_TBS = 4;	// status of turbo stand on/off
 	int addr_TBV = 5;	// status of tubo venting on/off
 
 
 //Variables
-	String command = String("Syntax");	// command user input via serial port
+	String command = "Syntax";	// command user input via serial port
 	int value = 1;	// command parameter value
+
+	String cmdlist = "NON STA VA1 VA2 TBM TBV TBS EEP RES HELLO";
+	int cmdind = 0;
 	
 	int Valve1Status = 0;	// initialise valve status
-	int Valve2Status = LOW;	// initialise valve status
+	int Valve2Status = 0;	// initialise valve status
 	int TurboPump_Vent_Status = 0;
 	int TurboPump_Motor_Status = 0;
 	int TurboPump_Station_Status = 0;
-//	int Needle_valveOpen = 0;
+	int Needle_valveOpen = 0;
 	int val_P1 = 0;  
 	int val_P2 = 0;
 	int Turbo_Pump_Speed = 0;
-
 
 // ------------------------------------------------------------------
 // initialisation
@@ -59,25 +61,30 @@ void setup()
 	{
 
 
-//	checkValveState(); // get status from EEPROM
+	checkValveState(); // get status from EEPROM
 	
 // initialise pins for in or output	
+// Chamber venting valves
 	pinMode(Valve1,OUTPUT);	// initialise and set to current value
 	digitalWrite(Valve1,Valve1Status);
-/*//	pinMode(valve1Read,INPUT);
-
-	pinMode(Valve2,OUTPUT,Valve2Status);
-
-	pinMode(TurboPump_Vent,OUTPUT,TurboPump_Vent_Status);
-	pinMode(TurboPump_Motor,OUTPUT,TurboPump_Motor_Status);
-	pinMode(TurboPump_Station,OUTPUT,TurboPump_Station_Status);
+	pinMode(valve1Read,INPUT);
+	pinMode(Valve2,OUTPUT);
+	digitalWrite(Valve2,Valve2Status);
+	pinMode(valve2Read,INPUT);
+	
+	pinMode(TurboPump_Vent,OUTPUT);
+	digitalWrite(TurboPump_Vent,TurboPump_Vent_Status);
+	pinMode(TurboPump_Motor,OUTPUT);
+	digitalWrite(TurboPump_Motor,TurboPump_Motor_Status);
+	pinMode(TurboPump_Station,OUTPUT);
+	digitalWrite(TurboPump_Station,TurboPump_Station_Status);
 
 //	pinMode(NeedleValve,OUTPUT);
-  
+/*  
 	pinMode(P1_Pin,INPUT);
 	pinMode(P2_Pin,INPUT);
 	pinMode(Turbo_Pump_Speed,INPUT);
-
+*/
 // initialize serial communication:
 	Serial.begin(baudrate);
 	while (!Serial)
@@ -86,85 +93,191 @@ void setup()
 	}
 	Serial.flush();
 	String welcome_msg = "MSG: Valve and pump control.";
-	Serial.println(welcome_msg);
-	Serial.println("SV: " + Version);
-	
-*/
-// write current status to serial here ++++++++++++++++++++++++++++++!	
+//	Serial.println(welcome_msg);
+//	Serial.println("SVE: " + Version);
+
+	wdt_enable(WDTO_8S);   // Watchdog set to 8 s [Arduino resets after 8s "hanging"]
 	}
 
 // main loop
 void loop()
 	{
-/* get a command from serial input
-//	if (Serial.available() > 0)
-//		{
+// get a command from serial input
+	if (Serial.available() > 0)
+		{
 //		command = Serial.readStringUntil(':');	// read command input until delimiter
-//		command.toUpperCase();					// convert command input to upper case
-//		value = Serial.parseInt();				// get parameter value for command
-//		}
+		String Sercommand = Serial.readString();	// read command input until delimiter
+		Sercommand.toUpperCase();
+		Sercommand.trim();
+// Serial.print("Received ");
+// Serial.println(Sercommand);
+		// convert command input to upper case
+		int delim = Sercommand.indexOf(':');
+		command = Sercommand.substring(0,delim);
+		
+		String svalue = Sercommand.substring(delim+1);
+
+		value = svalue.toInt();				// get parameter value for command
+// Serial.println("Command: " + command);
+// Serial.print("Value ");
+// Serial.println(value);
+		
+		cmdind = cmdlist.indexOf(command);
+//		cmdind = cmdindstr.toInt();
+
+// Serial.println("Cmd index " + String(cmdind));
+
+		}
+	else
+		{
+		command = "Nothing";
+		}
 // State machine to control the device
 // Selecting for commands
-	switch (command) // Main selector
-//	{
-//		case 'STA':	// get status information of all devices
-//		{
-//		
-//		}
-//		break;
-		case 'VA1':	// control valve 1
+	switch (cmdind) // Main selector
+	{
+		case 4:	// STA get status information of all devices
 		{
-			Serial.print("VA1");
-			Serial.println(value);
-			if (value != Valve1Status);
+		Serial.println("STA received");
+		Serial.print("status:");
+		Serial.print(",");
+		Serial.print(digitalRead(Valve1));
+		Serial.print(",");
+		Serial.print(digitalRead(Valve2));
+		Serial.print(",");
+		Serial.print(digitalRead(TurboPump_Motor));
+		Serial.print(",");
+		Serial.print(digitalRead(TurboPump_Station));       
+		Serial.print(",");
+		Serial.print(digitalRead(TurboPump_Vent));
+		Serial.print(",");
+		Serial.print(Needle_valveOpen);  
+		Serial.print(",");
+		Serial.print(analogRead(P1_Pin));  
+		Serial.print(",");
+		Serial.print(analogRead(P2_Pin));
+		Serial.print(",");
+		Serial.println(analogRead(Turbo_Pump_Speed));  
+
+		}
+		break;	
+		case 8:	//VA1 control valve 1
+		{			
+			if (value != Valve1Status)
 			{
-//				digitalWrite(Valve1,Valve1Status);
+//				Serial.println("VA1 status changed " + String(value));
+				digitalWrite(Valve1,value);
 				// update EEPROM value
+				EEPROM.update(addr_VA1,value);
 			}
+			Valve1Status = value;
+			Serial.print("VA1:");
+//			Serial.println(Valve1Status);
+			Serial.println(value);
 		}
 		break;
-		case 'VA2':	// control valve 1
+		case 12:	//'VA2' control valve 1
 		{
-			Serial.print("VA2");
+			if (value != Valve2Status)
+			{
+//				Serial.println("VA2 status changed " + String(value));
+				digitalWrite(Valve2,value);
+				// update EEPROM value
+				EEPROM.update(addr_VA2,value);
+			}
+			Valve2Status = value;
+			Serial.print("VA2:");
 			Serial.println(value);
-//			if (value != Valve2Status);
-//			{
-//				// update EEPROM value
-//			}
+		}
+		break;
+		case 16: // 'TBM'control turbo pump motor on/off
+		{
+			if (value != TurboPump_Motor_Status)
+			{
+				Serial.println("TBM status changed " + String(value));
+				digitalWrite(TurboPump_Motor,value);
+				EEPROM.update(addr_TBM,value);
+			}
+			TurboPump_Motor_Status = value;
+			Serial.print("TBM : ");
+			Serial.println(value);
+		}
+		break;
+		case 20: //'TBV' control turbo pump venting on/off
+		{
+			if (value != TurboPump_Station_Status)
+			{
+				Serial.println("TBV status changed " + String(value));
+				digitalWrite(TurboPump_Station,value);
+				EEPROM.update(addr_TBV,value);
+			}
+			TurboPump_Station_Status = value;
+			Serial.print("TBV:");
+			Serial.println(value);
+		}
+		break;
+		case 24: //'TBS' control turbo pump stand on/off
+		{
+			if (value != TurboPump_Vent_Status)
+			{
+				Serial.println("TBS status changed " + String(value));
+				digitalWrite(TurboPump_Vent,value);
+				EEPROM.update(addr_TBS,value);
+			}
+			TurboPump_Vent_Status = value;
+			Serial.print("TBS:");
+			Serial.println(value);
+		}
+		break;
+		case 28: // EEPROM values
+		{
+			Serial.print("EEPROM status: ");
+			Serial.print(EEPROM.read(addr_VA1));
+			Serial.print(",");
+			Serial.print(EEPROM.read(addr_VA2));
+			Serial.print(",");
+			Serial.print(EEPROM.read(addr_TBM));
+			Serial.print(",");
+			Serial.print(EEPROM.read(addr_TBS));
+			Serial.print(",");
+			Serial.println(EEPROM.read(addr_TBV));
+
+		}
+		break;
+		case 32: // RES force reboot
+		{
+			delay(10000);	// wait 10 s to trigger watchdog
+					/*	delay time has to be larger than
+						watchdog critical time!
+						default wd time 8 s
+						overun causes soft reboot
+					*/
+		}
+		break;
+		case 36: // service message
+		{
+			Serial.println("Hello_Pumping");
+		}
+		break;
+/*		case 'NVL': // control needle valve
+		{
+		// not implemented
 		}
 		break;
 */
-/*
-		case 'TBM': // control turbo pump motor on/off
-		{
-		}
-		break;
-		case 'TBS': // control turbo pump stand on/off
-		{
-		}
-		break;
-		case 'TBV': // control turbo pump venting on/off
-		{
-		}
-		break;
-		case 'NVL': // control needle valve
-		{
-		}
-		break;
-
 		default: // command not recognised or no command
 			// do nothing
 		break;
 		
-//	}
-*/
+	}
+	cmdind = 0;
 
-	
+	wdt_reset();		// reset watchdog to prevent automatic reset	
 	}
 // #################### End of code ######################
 // subroutines below here
-/*void checkValveState() // read status values stored in EEPROM
-//	{
+void checkValveState() // read status values stored in EEPROM
+	{
 //
 //	int addr_VA1 = 1;	// status of valve 1 on/off
 //	int addr_VA2 = 2;	// status of valve 1 on/off
@@ -174,11 +287,10 @@ void loop()
 //
 
 //	Serial.println("Valve status after restart: ");
-//	Valve1Status = EEPROM.read(addr_VA1);
-//	Valve2Status = EEPROM.read(addr_VA2);
-//	TurboPump_Vent_Status = EEPROM.read(addr_TBV);
-//	TurboPump_Station_Status = EEPROM.read(addr_TBS);
-//	TurboPump_Motor_Status = EEPROM.read(addr_TBM);
+	Valve1Status = EEPROM.read(addr_VA1);
+	Valve2Status = EEPROM.read(addr_VA2);
+	TurboPump_Vent_Status = EEPROM.read(addr_TBV);
+	TurboPump_Station_Status = EEPROM.read(addr_TBS);
+	TurboPump_Motor_Status = EEPROM.read(addr_TBM);
 
-//	}
-*/
+	}
